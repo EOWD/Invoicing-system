@@ -1,0 +1,43 @@
+{
+  "company": {
+    "name": "UAB \"Orbitana\"",
+    "address": "Vingio g. 21-76, Alytus LT-63216, Lithuania",
+    "vatNumber": "LT100002041516",
+    "companyCode": "300510839",
+    "phone": "+370 123 45678",
+    "email": "info@orbitana.lt",
+    "logoPath": "",
+    "bankName": "70440 - SEB bankas",
+    "bankAccount": "LT467044090100342131",
+    "swift": "CBVILT2X",
+    "ceo": "",
+    "website": ""
+  },
+  "buyer": {
+    "name": "",
+    "address": "",
+    "vatNumber": ""
+  },
+  "invoice": {
+    "currency": "EUR",
+    "prefix": "INV",
+    "nextNumber": 1,
+    "paymentTerms": "Net 30",
+    "deliveryTerms": "",
+    "footerNotes": "Thank you for your business. Please pay by the due date."
+  },
+  "tax": {
+    "vatRatePercent": 20,
+    "pricesIncludeVat": false
+  },
+  "shipping": {
+    "mode": "fixed",
+    "fixedAmount": 5
+  },
+  "prices": {},
+  "customProducts": {},
+  "senderProfiles": [],
+  "receiverProfiles": [],
+  "activeSenderId": "",
+  "activeReceiverId": ""
+}

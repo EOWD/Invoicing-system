@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+  <title>Invoicing System</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <nav class="tabs" role="tablist">
+    <button type="button" role="tab" data-tab="prices" class="active" aria-selected="true">Prices</button>
+    <button type="button" role="tab" data-tab="settings" aria-selected="false">Settings</button>
+    <button type="button" role="tab" data-tab="packlist" aria-selected="false">Packlist & Invoices</button>
+    <button type="button" role="tab" data-tab="history" aria-selected="false">History</button>
+  </nav>
+
+  <section id="panel-prices" class="panel active">
+    <h2>Product prices</h2>
+    <div class="toolbar">
+      <button type="button" class="primary" id="btnLoadSkuGuide">Load SKU guide (CSV)</button>
+      <button type="button" class="secondary" id="btnLoadDefaultCatalog">Load default product catalog</button>
+      <span id="skuGuidePath"></span>
+    </div>
+    <details class="add-sku-collapsible">
+      <summary>Add new product to catalog</summary>
+      <div class="add-sku-form">
+        <div class="form-grid">
+          <div class="form-row"><label>ID (SKU)</label><input type="text" id="newSkuId" placeholder="e.g. CUSTOM-001" /></div>
+          <div class="form-row"><label>Title</label><input type="text" id="newSkuTitle" placeholder="Product description" /></div>
+          <div class="form-row"><label>GTIN (optional)</label><input type="text" id="newSkuGtin" placeholder="" /></div>
+          <div class="form-row"><label>Batch (optional)</label><input type="text" id="newSkuBatch" placeholder="" /></div>
+          <div class="form-row"><label>Unit price</label><input type="number" id="newSkuPrice" step="0.01" min="0" placeholder="0.00" /></div>
+        </div>
+        <button type="button" class="primary" id="btnAddSku">Add SKU</button>
+      </div>
+    </details>
+    <div id="pricesMessage"></div>
+    <div class="catalog-search-row">
+      <label for="catalogSearch">Search catalog</label>
+      <input type="text" id="catalogSearch" placeholder="Search by ID, title, GTIN, batch…" />
+    </div>
+    <div id="pricesTableWrapper">
+      <table id="pricesTable">
+        <thead><tr><th>ID</th><th>Title</th><th>EAN / GTIN</th><th>Batch</th><th>In stock</th><th>Unit price</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="toolbar toolbar-mt">
+      <button type="button" class="primary" id="btnSavePrices">Save prices</button>
+    </div>
+  </section>
+
+  <section id="panel-settings" class="panel">
+    <h2>Settings</h2>
+    <div id="settingsMessage"></div>
+
+    <div class="settings-sample-box">
+      <h3 class="settings-section-title">Sample data</h3>
+      <p>Add demo sender and receiver profiles plus sample invoice settings to try the app. Existing profiles are kept—sample profiles are added to your list so you can edit or delete them anytime.</p>
+      <button type="button" class="primary" id="btnLoadSample">Add sample profiles</button>
+    </div>
+
+    <div class="settings-card">
+      <h3 class="settings-section-title">Sender profiles (issuer – your company)</h3>
+      <div class="profile-row">
+        <div>
+          <label>Choose sender (used on invoices)</label>
+          <select id="senderProfileSelect"><option value="">— None —</option></select>
+        </div>
+        <span class="profile-buttons">
+          <button type="button" class="secondary" id="btnNewSender">New sender</button>
+          <button type="button" class="secondary" id="btnSaveSender">Save sender</button>
+          <button type="button" class="secondary" id="btnDeleteSender">Delete</button>
+        </span>
+      </div>
+      <div class="form-grid sender-fields">
+        <div class="form-row"><label>Company name</label><input type="text" id="senderName" placeholder="e.g. Viola Warenhandels-GmbH" /></div>
+        <div class="form-row"><label>VAT number</label><input type="text" id="senderVat" placeholder="e.g. DE123456789" /></div>
+        <div class="form-row full-width"><label>Address</label><textarea id="senderAddress" placeholder="Street, City, Postcode, Country"></textarea></div>
+        <div class="form-row"><label>Company code</label><input type="text" id="senderCompanyCode" placeholder="Registration / Co.Code" /></div>
+        <div class="form-row"><label>Phone</label><input type="text" id="senderPhone" /></div>
+        <div class="form-row"><label>Email</label><input type="email" id="senderEmail" /></div>
+        <div class="form-row"><label>CEO / Contact</label><input type="text" id="senderCeo" placeholder="Optional" /></div>
+        <div class="form-row"><label>Website</label><input type="text" id="senderWebsite" placeholder="e.g. www.example.com" /></div>
+        <div class="form-row full-width">
+          <label>Logo image (summary page)</label>
+          <div class="input-with-button">
+            <input type="text" id="senderLogoPath" placeholder="Path to PNG or JPG (e.g. after Browse)" />
+            <button type="button" class="secondary" id="btnSenderLogoBrowse">Browse</button>
+          </div>
+        </div>
+      </div>
+      <h4 class="settings-subsection-title">Payment information (Zahlungsdetails)</h4>
+      <p class="settings-subsection-desc">Shown in the invoice footer under &quot;Payment Information&quot;. Payment reference will be the invoice number.</p>
+      <div class="form-grid sender-fields">
+        <div class="form-row"><label>Bank name</label><input type="text" id="senderBankName" placeholder="e.g. Berliner Sparkasse" /></div>
+        <div class="form-row full-width"><label>Bank address</label><input type="text" id="senderBankAddress" placeholder="e.g. Wilmersdorfer Straße 57, 10627 Berlin" /></div>
+        <div class="form-row"><label>IBAN</label><input type="text" id="senderBankAccount" placeholder="e.g. DE64 1005 0000 0191 1171 29" /></div>
+        <div class="form-row"><label>SWIFT / BIC</label><input type="text" id="senderSwift" placeholder="e.g. BELADEBEXXX" /></div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3 class="settings-section-title">Receiver profiles (invoice issued to)</h3>
+      <div class="profile-row">
+        <div>
+          <label>Choose receiver (used on invoices)</label>
+          <select id="receiverProfileSelect"><option value="">— None —</option></select>
+        </div>
+        <span class="profile-buttons">
+          <button type="button" class="secondary" id="btnNewReceiver">New receiver</button>
+          <button type="button" class="secondary" id="btnSaveReceiver">Save receiver</button>
+          <button type="button" class="secondary" id="btnDeleteReceiver">Delete</button>
+        </span>
+      </div>
+      <div class="form-grid receiver-fields">
+        <div class="form-row full-width"><label>Company name</label><input type="text" id="receiverName" placeholder="e.g. Baby&#39;s Best Food GmbH" /></div>
+        <div class="form-row full-width"><label>Address</label><textarea id="receiverAddress" placeholder="Street, City, Postcode, Country"></textarea></div>
+        <div class="form-row"><label>VAT number</label><input type="text" id="receiverVat" placeholder="e.g. DE327328168" /></div>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3 class="settings-section-title">Invoice</h3>
+      <div class="form-grid">
+        <div class="form-row"><label>Currency</label><input type="text" id="invoiceCurrency" placeholder="EUR" /></div>
+        <div class="form-row"><label>Invoice prefix</label><input type="text" id="invoicePrefix" placeholder="INV or PF" /></div>
+        <div class="form-row"><label>Next invoice number</label><input type="number" id="invoiceNextNumber" min="1" /></div>
+        <div class="form-row full-width">
+          <label>Invoice save directory</label>
+          <div class="input-with-button">
+            <input type="text" id="invoiceSaveDirectory" placeholder="Leave empty to choose each time. Otherwise, a daily folder (YYYY-MM-DD) is created here." />
+            <button type="button" class="secondary" id="btnInvoiceSaveDirBrowse">Browse</button>
+          </div>
+        </div>
+        <div class="form-row"><label>Payment terms</label><input type="text" id="invoicePaymentTerms" placeholder="e.g. 100% Vorkasse, Net 30" /></div>
+        <div class="form-row"><label>Delivery terms</label><input type="text" id="invoiceDeliveryTerms" placeholder="e.g. Frei Haus - Berlin" /></div>
+      <div class="form-row full-width"><label>Footer notes</label><textarea id="invoiceFooterNotes" placeholder="Thank you for your business."></textarea></div>
+    </div>
+    </div>
+
+    <div class="settings-card">
+      <h3 class="settings-section-title">Tax &amp; shipping</h3>
+      <div class="form-grid">
+        <div class="form-row"><label>VAT rate (%)</label><input type="number" id="vatRate" step="0.01" min="0" max="100" placeholder="e.g. 7 or 20" /></div>
+        <div class="form-row"><label>Shipping (fixed amount per order)</label><input type="number" id="shippingAmount" step="0.01" min="0" /></div>
+        <div class="form-row full-width"><label><input type="checkbox" id="pricesIncludeVat" /> Prices include VAT</label></div>
+      </div>
+    </div>
+
+    <div class="settings-toolbar">
+      <button type="button" class="primary" id="btnSaveSettings">Save settings</button>
+      <button type="button" class="secondary" id="btnResetConfig">Reset to default</button>
+      <button type="button" class="secondary" id="btnLoadConfig">Load config...</button>
+      <button type="button" class="secondary" id="btnSaveConfigAs">Save config as...</button>
+    </div>
+  </section>
+
+  <section id="panel-packlist" class="panel">
+    <h2>Packlist & Invoices</h2>
+    <div id="packlistDropZone" class="drop-zone">
+      <p class="drop-zone-text">Drop packlist CSV here or click to choose file</p>
+      <button type="button" class="primary" id="btnLoadPacklist">Load packlist (CSV)</button>
+    </div>
+    <div class="toolbar toolbar-mt-sm">
+      <span id="packlistPath"></span>
+    </div>
+    <div id="packlistMessage"></div>
+    <div class="toolbar toolbar-mt-sm">
+      <label for="packlistBatchNumber">Fallback batch (optional)</label>
+      <input type="text" id="packlistBatchNumber" placeholder="Only used when packlist and SKU guide have no batch for a line" />
+    </div>
+    <div id="ordersPreview" class="orders-preview"></div>
+    <div class="toolbar toolbar-mt">
+      <button type="button" class="secondary" id="btnPreviewPdf">Preview</button>
+      <button type="button" class="primary" id="btnGeneratePdf">Generate invoice</button>
+    </div>
+  </section>
+
+  <section id="panel-history" class="panel">
+    <h2>Invoice history</h2>
+    <p class="muted">Generated invoices are listed below. Use Open to open the PDF file.</p>
+    <div id="historyMessage"></div>
+    <div id="historyTableWrapper" class="table-wrapper">
+      <table id="historyTable">
+        <thead><tr><th>Invoice number</th><th>Date</th><th>Issued to</th><th>Orders</th><th>File</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>

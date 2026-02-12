@@ -1,0 +1,47 @@
+{
+  "name": "invoicing-system",
+  "version": "1.0.0",
+  "description": "Invoicing System - Mac and Windows desktop app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "nodemon --watch main.js --watch preload.js --watch index.html --watch renderer.js --watch lib --watch styles.css --ignore config/ --ext js,json,html,css --exec \"electron .\"",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "config": {
+    "forge": {
+      "packagerConfig": {},
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "config": {
+            "name": "invoicing-system"
+          }
+        },
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": [
+            "darwin"
+          ]
+        }
+      ]
+    }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@electron-forge/cli": "^7.2.0",
+    "@electron-forge/maker-squirrel": "^7.2.0",
+    "@electron-forge/maker-zip": "^7.2.0",
+    "electron": "^33.4.11",
+    "nodemon": "^3.1.11"
+  },
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1",
+    "pdf-lib": "^1.17.1"
+  }
+}
