@@ -8,11 +8,16 @@
     "dev": "nodemon --watch main.js --watch preload.js --watch index.html --watch renderer.js --watch lib --watch styles.css --ignore config/ --ext js,json,html,css --exec \"electron .\"",
     "package": "electron-forge package",
     "make": "electron-forge make",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "config": {
     "forge": {
-      "packagerConfig": {},
+      "packagerConfig": {
+        "icon": "./assets/icon",
+        "name": "Invoicing System"
+      },
       "makers": [
         {
           "name": "@electron-forge/maker-squirrel",
@@ -30,7 +35,7 @@
     }
   },
   "keywords": [],
-  "author": "",
+  "author": "Eiad Oraby",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
@@ -38,10 +43,26 @@
     "@electron-forge/maker-squirrel": "^7.2.0",
     "@electron-forge/maker-zip": "^7.2.0",
     "electron": "^33.4.11",
+    "electron-builder": "^26.7.0",
     "nodemon": "^3.1.11"
   },
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1",
     "pdf-lib": "^1.17.1"
+  },
+  "build": {
+    "appId": "com.eiadoraby.invoicing-system",
+    "productName": "Invoicing System",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "mac": {
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.business"
+    },
+    "win": {
+      "icon": "assets/icon.ico"
+    }
   }
 }

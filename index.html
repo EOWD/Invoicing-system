@@ -3,11 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; img-src 'self' data:">
   <title>Invoicing System</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div id="loginOverlay" class="login-overlay">
+    <div class="login-box">
+      <img src="assets/logo.png" alt="" class="login-logo">
+      <h2 class="login-title">Invoicing System</h2>
+      <p class="login-hint">Enter access code to continue</p>
+      <form id="loginForm" class="login-form">
+        <input type="password" id="loginInput" class="login-input" placeholder="Access code" autocomplete="off" />
+        <p id="loginError" class="login-error" aria-live="polite"></p>
+        <button type="submit" class="primary login-submit">Unlock</button>
+      </form>
+    </div>
+  </div>
+  <div id="appMain" class="app-main hidden">
+  <header class="app-header">
+    <img src="assets/logo.png" alt="" class="app-header-logo">
+    <h1 class="app-header-title">Invoicing System</h1>
+  </header>
   <nav class="tabs" role="tablist">
     <button type="button" role="tab" data-tab="prices" class="active" aria-selected="true">Prices</button>
     <button type="button" role="tab" data-tab="settings" aria-selected="false">Settings</button>
@@ -19,7 +36,7 @@
     <h2>Product prices</h2>
     <div class="toolbar">
       <button type="button" class="primary" id="btnLoadSkuGuide">Load SKU guide (CSV)</button>
-      <button type="button" class="secondary" id="btnLoadDefaultCatalog">Load default product catalog</button>
+      <button type="button" class="secondary" id="btnLoadDefaultCatalog">Load Baby best food catalog</button>
       <span id="skuGuidePath"></span>
     </div>
     <details class="add-sku-collapsible">
@@ -30,6 +47,7 @@
           <div class="form-row"><label>Title</label><input type="text" id="newSkuTitle" placeholder="Product description" /></div>
           <div class="form-row"><label>GTIN (optional)</label><input type="text" id="newSkuGtin" placeholder="" /></div>
           <div class="form-row"><label>Batch (optional)</label><input type="text" id="newSkuBatch" placeholder="" /></div>
+          <div class="form-row"><label>BBD (optional)</label><input type="text" id="newSkuBbd" placeholder="e.g. 2025-12-31" title="Best Before Date" /></div>
           <div class="form-row"><label>Unit price</label><input type="number" id="newSkuPrice" step="0.01" min="0" placeholder="0.00" /></div>
         </div>
         <button type="button" class="primary" id="btnAddSku">Add SKU</button>
@@ -38,11 +56,11 @@
     <div id="pricesMessage"></div>
     <div class="catalog-search-row">
       <label for="catalogSearch">Search catalog</label>
-      <input type="text" id="catalogSearch" placeholder="Search by ID, title, GTIN, batch…" />
+      <input type="text" id="catalogSearch" placeholder="Search by ID, title, GTIN, batch, BBD…" />
     </div>
     <div id="pricesTableWrapper">
       <table id="pricesTable">
-        <thead><tr><th>ID</th><th>Title</th><th>EAN / GTIN</th><th>Batch</th><th>In stock</th><th>Unit price</th></tr></thead>
+        <thead><tr><th>ID</th><th>Title</th><th>EAN / GTIN</th><th>Batch</th><th>BBD</th><th>In stock</th><th>Unit price</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -190,6 +208,7 @@
     </div>
   </section>
 
+  </div>
   <script src="./renderer.js"></script>
 </body>
 </html>

@@ -1,6 +1,30 @@
 (function () {
   const api = window.invoicing;
 
+  const loginForm = document.getElementById('loginForm');
+  const loginInput = document.getElementById('loginInput');
+  const loginError = document.getElementById('loginError');
+  const loginOverlay = document.getElementById('loginOverlay');
+  const appMain = document.getElementById('appMain');
+
+  if (loginForm && api) {
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (loginError) loginError.textContent = '';
+      const value = loginInput ? loginInput.value : '';
+      const result = await api.checkUnlock(value);
+      if (result && result.ok) {
+        loginOverlay.classList.add('hidden');
+        appMain.classList.remove('hidden');
+        if (loginInput) loginInput.value = '';
+      } else {
+        if (loginError) loginError.textContent = 'Incorrect access code';
+        if (loginInput) loginInput.select();
+      }
+    });
+    if (loginInput) loginInput.focus();
+  }
+
   let skuGuidePath = '';
   let packlistPath = '';
   let products = [];
@@ -90,6 +114,7 @@
       ...p,
       price: prices[p.id] != null ? prices[p.id] : (p.price != null ? p.price : ''),
       inStock: inStock[p.id] === false ? false : true,
+      bbd: p.bbd != null ? p.bbd : '',
     }));
     Object.entries(custom).forEach(([id, p]) => {
       const existing = map.get(id);
@@ -97,6 +122,7 @@
         id,
         gtin: p.gtin != null ? p.gtin : (existing && existing.gtin) || '',
         batch: p.batch != null ? p.batch : (existing && existing.batch) || '',
+        bbd: p.bbd != null ? p.bbd : (existing && existing.bbd) || '',
         title: (p.title && p.title.trim()) ? p.title : (existing && existing.title) || id,
         price: prices[id] != null ? prices[id] : (p.price != null ? p.price : (existing && existing.price != null ? existing.price : '')),
         inStock: inStock[id] === false ? false : true,
@@ -118,19 +144,22 @@
         const title = (p.title || '').toLowerCase();
         const gtin = (p.gtin != null ? String(p.gtin) : '').toLowerCase();
         const batch = (p.batch != null ? String(p.batch) : '').toLowerCase();
-        return id.includes(search) || title.includes(search) || gtin.includes(search) || batch.includes(search);
+        const bbd = (p.bbd != null ? String(p.bbd) : '').toLowerCase();
+        return id.includes(search) || title.includes(search) || gtin.includes(search) || batch.includes(search) || bbd.includes(search);
       });
     }
     merged.forEach((p) => {
       const tr = document.createElement('tr');
       const gtinVal = (p.gtin != null ? p.gtin : '') + '';
       const batchVal = (p.batch != null ? p.batch : '') + '';
+      const bbdVal = (p.bbd != null ? p.bbd : '') + '';
       const checked = p.inStock !== false;
       tr.innerHTML =
         '<td>' + escapeHtml(p.id) + '</td><td>' +
         escapeHtml((p.title || '').slice(0, 60)) + (p.title && p.title.length > 60 ? '...' : '') + '</td>' +
         '<td><input type="text" data-sku="' + escapeHtml(p.id) + '" data-field="gtin" value="' + escapeHtml(gtinVal) + '" placeholder="EAN/GTIN" /></td>' +
         '<td><input type="text" data-sku="' + escapeHtml(p.id) + '" data-field="batch" value="' + escapeHtml(batchVal) + '" placeholder="Batch" /></td>' +
+        '<td><input type="text" data-sku="' + escapeHtml(p.id) + '" data-field="bbd" value="' + escapeHtml(bbdVal) + '" placeholder="BBD" title="Best Before Date" /></td>' +
         '<td><input type="checkbox" data-sku="' + escapeHtml(p.id) + '" data-field="inStock" ' + (checked ? 'checked' : '') + ' title="Uncheck if out of stock (line will be skipped on invoice)" /></td>' +
         '<td><input type="number" step="0.01" min="0" data-sku="' + escapeHtml(p.id) + '" data-field="price" value="' + (p.price === '' || p.price == null ? '' : p.price) + '" /></td>';
       tbody.appendChild(tr);
@@ -168,6 +197,9 @@
       if (p.batch != null && String(p.batch).trim() !== '') {
         config.customProducts[p.id] = { ...(config.customProducts[p.id] || {}), batch: String(p.batch).trim() };
       }
+      if (p.bbd != null && String(p.bbd).trim() !== '') {
+        config.customProducts[p.id] = { ...(config.customProducts[p.id] || {}), bbd: String(p.bbd).trim() };
+      }
     });
     showMessage('prices', 'Loaded ' + products.length + ' products.', 'success');
     renderPricesTable();
@@ -181,9 +213,9 @@
     }
     products = res.products || [];
     skuGuidePath = await api.getDefaultSkuGuidePath();
-    document.getElementById('skuGuidePath').textContent = '(default catalog – ' + products.length + ' products)';
+    document.getElementById('skuGuidePath').textContent = '(Baby best food – ' + products.length + ' products)';
     config = await api.getConfig();
-    showMessage('prices', 'Loaded default catalog: ' + products.length + ' products.', 'success');
+    showMessage('prices', 'Loaded Baby best food: ' + products.length + ' products.', 'success');
     renderPricesTable();
   });
 
@@ -199,7 +231,8 @@
     if (!config) config = await api.getConfig();
     config.customProducts = config.customProducts || {};
     const batch = document.getElementById('newSkuBatch').value.trim();
-    config.customProducts[id] = { title: title || id, gtin, batch };
+    const bbd = document.getElementById('newSkuBbd').value.trim();
+    config.customProducts[id] = { title: title || id, gtin, batch, bbd: bbd || undefined };
     config.prices = config.prices || {};
     config.prices[id] = price;
     config = await api.saveConfig(config);
@@ -207,6 +240,7 @@
     document.getElementById('newSkuTitle').value = '';
     document.getElementById('newSkuGtin').value = '';
     document.getElementById('newSkuBatch').value = '';
+    document.getElementById('newSkuBbd').value = '';
     document.getElementById('newSkuPrice').value = '';
     showMessage('prices', 'SKU added. Save prices to persist.', 'success');
     renderPricesTable();
@@ -230,6 +264,9 @@
       } else if (field === 'batch') {
         const batch = (input.value || '').trim();
         config.customProducts[sku] = { ...(config.customProducts[sku] || {}), batch };
+      } else if (field === 'bbd') {
+        const bbd = (input.value || '').trim();
+        config.customProducts[sku] = { ...(config.customProducts[sku] || {}), bbd: bbd || undefined };
       } else if (field === 'inStock') {
         if (input.checked) delete config.inStock[sku]; else config.inStock[sku] = false;
       }
@@ -679,9 +716,9 @@
     if (!res.error && res.products && res.products.length) {
       products = res.products;
       skuGuidePath = await api.getDefaultSkuGuidePath();
-      document.getElementById('skuGuidePath').textContent = '(default catalog – ' + products.length + ' products)';
+      document.getElementById('skuGuidePath').textContent = '(Baby best food – ' + products.length + ' products)';
     } else if (config.customProducts && Object.keys(config.customProducts).length) {
-      products = Object.entries(config.customProducts).map(([id, p]) => ({ id, gtin: p.gtin || '', title: p.title || id }));
+      products = Object.entries(config.customProducts).map(([id, p]) => ({ id, gtin: p.gtin || '', title: p.title || id, batch: p.batch, bbd: p.bbd }));
       document.getElementById('skuGuidePath').textContent = '(custom products only)';
     }
     renderPricesTable();

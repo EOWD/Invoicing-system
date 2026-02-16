@@ -8,18 +8,22 @@ const { parseSkuGuide } = require('./lib/skuGuide');
 const { parsePacklist, parsePacklistFromContent } = require('./lib/packlist');
 const { loadConfig, saveConfig, resetToDefault, loadConfigFromFile, saveConfigToFile, getActiveSender, getActiveReceiver } = require('./lib/config');
 const { buildPdf } = require('./lib/pdfBuilder');
+const { check: checkUnlock } = require('./lib/unlock');
 
 let mainWindow;
 
 const createWindow = () => {
-  mainWindow = new BrowserWindow({
+  const iconPath = path.join(__dirname, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+  const opts = {
     width: 1200,
     height: 800,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
     },
-  });
+  };
+  if (fs.existsSync(iconPath)) opts.icon = iconPath;
+  mainWindow = new BrowserWindow(opts);
 
   mainWindow.loadFile('index.html');
 
@@ -78,6 +82,10 @@ ipcMain.handle('get-default-sku-guide-path', async () => {
 
 ipcMain.handle('get-config', async () => {
   return loadConfig();
+});
+
+ipcMain.handle('check-unlock', async (_, value) => {
+  return { ok: checkUnlock(value) };
 });
 
 ipcMain.handle('save-config', async (_, config) => {

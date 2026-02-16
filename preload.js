@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('invoicing', {
+  checkUnlock: (value) => ipcRenderer.invoke('check-unlock', value),
   readSkuGuide: (path) => ipcRenderer.invoke('read-sku-guide', path),
   loadDefaultSkuGuide: () => ipcRenderer.invoke('load-default-sku-guide'),
   getDefaultSkuGuidePath: () => ipcRenderer.invoke('get-default-sku-guide-path'),
