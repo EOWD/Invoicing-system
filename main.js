@@ -2,6 +2,7 @@
 if (require('electron-squirrel-startup')) process.exit(0);
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const fs = require('fs');
 
 const { parseSkuGuide } = require('./lib/skuGuide');
@@ -88,6 +89,11 @@ ipcMain.handle('check-unlock', async (_, value) => {
   return { ok: checkUnlock(value) };
 });
 
+ipcMain.handle('get-asset-url', (_, assetName) => {
+  const p = path.join(__dirname, 'assets', assetName);
+  return fs.existsSync(p) ? pathToFileURL(p).href : null;
+});
+
 ipcMain.handle('save-config', async (_, config) => {
   if (!config) return loadConfig();
   return saveConfig(config);
@@ -144,7 +150,12 @@ ipcMain.handle('open-path', async (_, filePath) => {
 ipcMain.handle('get-default-invoice-path', (_, { saveDir, filename }) => {
   if (!saveDir || typeof saveDir !== 'string') return filename || 'invoice.pdf';
   const date = new Date().toISOString().slice(0, 10);
-  return path.join(saveDir.trim(), date, filename || 'invoice.pdf');
+  // If saveDir ends with the date already, don't add it again
+  const trimmedDir = saveDir.trim();
+  if (trimmedDir.endsWith(date) || trimmedDir.endsWith('/' + date) || trimmedDir.endsWith('\\' + date)) {
+    return path.join(trimmedDir, filename || 'invoice.pdf');
+  }
+  return path.join(trimmedDir, date, filename || 'invoice.pdf');
 });
 
 ipcMain.handle('generate-pdf', async (_, { orders, config, skuGuidePath, outputPath, preview }) => {
@@ -157,11 +168,28 @@ ipcMain.handle('generate-pdf', async (_, { orders, config, skuGuidePath, outputP
   if (skuGuide.length === 0 && fs.existsSync(defaultSkuGuidePath)) {
     skuGuide = loadSkuGuideFromPath(defaultSkuGuidePath);
   }
-  const out = preview
+  let out = preview
     ? path.join(app.getPath('temp'), 'invoices_preview_' + Date.now() + '.pdf')
     : (outputPath || path.join(app.getPath('documents'), 'invoices_' + new Date().toISOString().slice(0, 10) + '.pdf'));
-  const outDir = path.dirname(out);
-  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  let outDir = path.dirname(out);
+  
+  // Try to create directory, fallback to documents if permission denied
+  if (!fs.existsSync(outDir)) {
+    try {
+      fs.mkdirSync(outDir, { recursive: true });
+    } catch (mkdirErr) {
+      // If we can't create the requested directory (permission issue), fallback to Documents
+      if (!preview) {
+        out = path.join(app.getPath('documents'), 'invoices_' + new Date().toISOString().slice(0, 10) + '.pdf');
+        outDir = path.dirname(out);
+        if (!fs.existsSync(outDir)) {
+          fs.mkdirSync(outDir, { recursive: true });
+        }
+      } else {
+        throw mkdirErr;
+      }
+    }
+  }
   const company = getActiveSender(cfg) || cfg.company;
   const buyer = getActiveReceiver(cfg) || cfg.buyer;
   const invoiceFromRequest = (config && config.invoice) || {};

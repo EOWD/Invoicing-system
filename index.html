@@ -48,6 +48,7 @@
           <div class="form-row"><label>GTIN (optional)</label><input type="text" id="newSkuGtin" placeholder="" /></div>
           <div class="form-row"><label>Batch (optional)</label><input type="text" id="newSkuBatch" placeholder="" /></div>
           <div class="form-row"><label>BBD (optional)</label><input type="text" id="newSkuBbd" placeholder="e.g. 2025-12-31" title="Best Before Date" /></div>
+          <div class="form-row"><label>Article no (optional)</label><input type="text" id="newSkuArticleNo" placeholder="e.g. ART-001" /></div>
           <div class="form-row"><label>Unit price</label><input type="number" id="newSkuPrice" step="0.01" min="0" placeholder="0.00" /></div>
         </div>
         <button type="button" class="primary" id="btnAddSku">Add SKU</button>
@@ -60,7 +61,7 @@
     </div>
     <div id="pricesTableWrapper">
       <table id="pricesTable">
-        <thead><tr><th>ID</th><th>Title</th><th>EAN / GTIN</th><th>Batch</th><th>BBD</th><th>In stock</th><th>Unit price</th></tr></thead>
+        <thead><tr><th>ID</th><th>Title</th><th>EAN / GTIN</th><th>Batch</th><th>BBD</th><th>Article no</th><th>In stock</th><th>Unit price</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -177,6 +178,10 @@
 
   <section id="panel-packlist" class="panel">
     <h2>Packlist & Invoices</h2>
+    <div class="toolbar toolbar-mb">
+      <button type="button" class="secondary" id="btnPreviewPdfTop">Preview</button>
+      <button type="button" class="primary" id="btnGeneratePdfTop">Generate invoice</button>
+    </div>
     <div id="packlistDropZone" class="drop-zone">
       <p class="drop-zone-text">Drop packlist CSV here or click to choose file</p>
       <button type="button" class="primary" id="btnLoadPacklist">Load packlist (CSV)</button>
@@ -208,6 +213,12 @@
     </div>
   </section>
 
+  <div id="saveSpinnerOverlay" class="save-spinner-overlay" aria-hidden="true">
+    <div class="save-spinner-box">
+      <div class="save-spinner" aria-hidden="true"></div>
+      <p class="save-spinner-text" id="saveSpinnerText">Saving…</p>
+    </div>
+  </div>
   </div>
   <script src="./renderer.js"></script>
 </body>

@@ -1,6 +1,14 @@
 (function () {
   const api = window.invoicing;
 
+  if (api && api.getAssetUrl) {
+    api.getAssetUrl('logo.png').then((url) => {
+      if (url) {
+        document.querySelectorAll('.app-header-logo, .login-logo').forEach((img) => { img.src = url; });
+      }
+    });
+  }
+
   const loginForm = document.getElementById('loginForm');
   const loginInput = document.getElementById('loginInput');
   const loginError = document.getElementById('loginError');
@@ -37,6 +45,17 @@
     if (!el) return;
     el.textContent = text;
     el.className = 'message ' + (type || 'info');
+  }
+
+  function showSaveSpinner(message) {
+    const el = document.getElementById('saveSpinnerOverlay');
+    const textEl = document.getElementById('saveSpinnerText');
+    if (textEl) textEl.textContent = message || 'Saving…';
+    if (el) { el.classList.add('visible'); el.setAttribute('aria-hidden', 'false'); }
+  }
+  function hideSaveSpinner() {
+    const el = document.getElementById('saveSpinnerOverlay');
+    if (el) { el.classList.remove('visible'); el.setAttribute('aria-hidden', 'true'); }
   }
 
   function switchTab(tabId) {
@@ -115,6 +134,7 @@
       price: prices[p.id] != null ? prices[p.id] : (p.price != null ? p.price : ''),
       inStock: inStock[p.id] === false ? false : true,
       bbd: p.bbd != null ? p.bbd : '',
+      articleNo: p.articleNo != null ? p.articleNo : '',
     }));
     Object.entries(custom).forEach(([id, p]) => {
       const existing = map.get(id);
@@ -123,6 +143,7 @@
         gtin: p.gtin != null ? p.gtin : (existing && existing.gtin) || '',
         batch: p.batch != null ? p.batch : (existing && existing.batch) || '',
         bbd: p.bbd != null ? p.bbd : (existing && existing.bbd) || '',
+        articleNo: p.articleNo != null ? p.articleNo : (existing && existing.articleNo) || '',
         title: (p.title && p.title.trim()) ? p.title : (existing && existing.title) || id,
         price: prices[id] != null ? prices[id] : (p.price != null ? p.price : (existing && existing.price != null ? existing.price : '')),
         inStock: inStock[id] === false ? false : true,
@@ -145,7 +166,8 @@
         const gtin = (p.gtin != null ? String(p.gtin) : '').toLowerCase();
         const batch = (p.batch != null ? String(p.batch) : '').toLowerCase();
         const bbd = (p.bbd != null ? String(p.bbd) : '').toLowerCase();
-        return id.includes(search) || title.includes(search) || gtin.includes(search) || batch.includes(search) || bbd.includes(search);
+        const articleNo = (p.articleNo != null ? String(p.articleNo) : '').toLowerCase();
+        return id.includes(search) || title.includes(search) || gtin.includes(search) || batch.includes(search) || bbd.includes(search) || articleNo.includes(search);
       });
     }
     merged.forEach((p) => {
@@ -153,6 +175,7 @@
       const gtinVal = (p.gtin != null ? p.gtin : '') + '';
       const batchVal = (p.batch != null ? p.batch : '') + '';
       const bbdVal = (p.bbd != null ? p.bbd : '') + '';
+      const articleNoVal = (p.articleNo != null ? p.articleNo : '') + '';
       const checked = p.inStock !== false;
       tr.innerHTML =
         '<td>' + escapeHtml(p.id) + '</td><td>' +
@@ -160,6 +183,7 @@
         '<td><input type="text" data-sku="' + escapeHtml(p.id) + '" data-field="gtin" value="' + escapeHtml(gtinVal) + '" placeholder="EAN/GTIN" /></td>' +
         '<td><input type="text" data-sku="' + escapeHtml(p.id) + '" data-field="batch" value="' + escapeHtml(batchVal) + '" placeholder="Batch" /></td>' +
         '<td><input type="text" data-sku="' + escapeHtml(p.id) + '" data-field="bbd" value="' + escapeHtml(bbdVal) + '" placeholder="BBD" title="Best Before Date" /></td>' +
+        '<td><input type="text" data-sku="' + escapeHtml(p.id) + '" data-field="articleNo" value="' + escapeHtml(articleNoVal) + '" placeholder="Art. no" /></td>' +
         '<td><input type="checkbox" data-sku="' + escapeHtml(p.id) + '" data-field="inStock" ' + (checked ? 'checked' : '') + ' title="Uncheck if out of stock (line will be skipped on invoice)" /></td>' +
         '<td><input type="number" step="0.01" min="0" data-sku="' + escapeHtml(p.id) + '" data-field="price" value="' + (p.price === '' || p.price == null ? '' : p.price) + '" /></td>';
       tbody.appendChild(tr);
@@ -200,6 +224,9 @@
       if (p.bbd != null && String(p.bbd).trim() !== '') {
         config.customProducts[p.id] = { ...(config.customProducts[p.id] || {}), bbd: String(p.bbd).trim() };
       }
+      if (p.articleNo != null && String(p.articleNo).trim() !== '') {
+        config.customProducts[p.id] = { ...(config.customProducts[p.id] || {}), articleNo: String(p.articleNo).trim() };
+      }
     });
     showMessage('prices', 'Loaded ' + products.length + ' products.', 'success');
     renderPricesTable();
@@ -228,51 +255,66 @@
       showMessage('prices', 'Enter SKU ID.', 'error');
       return;
     }
-    if (!config) config = await api.getConfig();
-    config.customProducts = config.customProducts || {};
-    const batch = document.getElementById('newSkuBatch').value.trim();
-    const bbd = document.getElementById('newSkuBbd').value.trim();
-    config.customProducts[id] = { title: title || id, gtin, batch, bbd: bbd || undefined };
-    config.prices = config.prices || {};
-    config.prices[id] = price;
-    config = await api.saveConfig(config);
-    document.getElementById('newSkuId').value = '';
-    document.getElementById('newSkuTitle').value = '';
-    document.getElementById('newSkuGtin').value = '';
-    document.getElementById('newSkuBatch').value = '';
-    document.getElementById('newSkuBbd').value = '';
-    document.getElementById('newSkuPrice').value = '';
-    showMessage('prices', 'SKU added. Save prices to persist.', 'success');
-    renderPricesTable();
+    showSaveSpinner();
+    try {
+      if (!config) config = await api.getConfig();
+      config.customProducts = config.customProducts || {};
+      const batch = document.getElementById('newSkuBatch').value.trim();
+      const bbd = document.getElementById('newSkuBbd').value.trim();
+      const articleNo = document.getElementById('newSkuArticleNo').value.trim();
+      config.customProducts[id] = { title: title || id, gtin, batch, bbd: bbd || undefined, articleNo: articleNo || undefined };
+      config.prices = config.prices || {};
+      config.prices[id] = price;
+      config = await api.saveConfig(config);
+      document.getElementById('newSkuId').value = '';
+      document.getElementById('newSkuTitle').value = '';
+      document.getElementById('newSkuGtin').value = '';
+      document.getElementById('newSkuBatch').value = '';
+      document.getElementById('newSkuBbd').value = '';
+      document.getElementById('newSkuArticleNo').value = '';
+      document.getElementById('newSkuPrice').value = '';
+      showMessage('prices', 'SKU added. Save prices to persist.', 'success');
+      renderPricesTable();
+    } finally {
+      hideSaveSpinner();
+    }
   });
 
   document.getElementById('btnSavePrices').addEventListener('click', async () => {
-    if (!config) config = await api.getConfig();
-    config.prices = config.prices || {};
-    config.customProducts = config.customProducts || {};
-    config.inStock = config.inStock || {};
-    document.querySelectorAll('#pricesTable input[data-sku]').forEach((input) => {
-      const sku = input.getAttribute('data-sku');
-      const field = input.getAttribute('data-field');
-      if (!sku) return;
-      if (field === 'price') {
-        const v = parseFloat(input.value);
-        config.prices[sku] = isNaN(v) ? 0 : v;
-      } else if (field === 'gtin') {
-        const gtin = (input.value || '').trim();
-        config.customProducts[sku] = { ...(config.customProducts[sku] || {}), gtin };
-      } else if (field === 'batch') {
-        const batch = (input.value || '').trim();
-        config.customProducts[sku] = { ...(config.customProducts[sku] || {}), batch };
-      } else if (field === 'bbd') {
-        const bbd = (input.value || '').trim();
-        config.customProducts[sku] = { ...(config.customProducts[sku] || {}), bbd: bbd || undefined };
-      } else if (field === 'inStock') {
-        if (input.checked) delete config.inStock[sku]; else config.inStock[sku] = false;
-      }
-    });
-    config = await api.saveConfig(config);
-    showMessage('prices', 'Prices saved.', 'success');
+    showSaveSpinner();
+    try {
+      if (!config) config = await api.getConfig();
+      config.prices = config.prices || {};
+      config.customProducts = config.customProducts || {};
+      config.inStock = config.inStock || {};
+      document.querySelectorAll('#pricesTable input[data-sku]').forEach((input) => {
+        const sku = input.getAttribute('data-sku');
+        const field = input.getAttribute('data-field');
+        if (!sku) return;
+        if (field === 'price') {
+          const v = parseFloat(input.value);
+          config.prices[sku] = isNaN(v) ? 0 : v;
+        } else if (field === 'gtin') {
+          const gtin = (input.value || '').trim();
+          config.customProducts[sku] = { ...(config.customProducts[sku] || {}), gtin };
+        } else if (field === 'batch') {
+          const batch = (input.value || '').trim();
+          config.customProducts[sku] = { ...(config.customProducts[sku] || {}), batch };
+        } else if (field === 'bbd') {
+          const bbd = (input.value || '').trim();
+          config.customProducts[sku] = { ...(config.customProducts[sku] || {}), bbd: bbd || undefined };
+        } else if (field === 'articleNo') {
+          const articleNo = (input.value || '').trim();
+          config.customProducts[sku] = { ...(config.customProducts[sku] || {}), articleNo: articleNo || undefined };
+        } else if (field === 'inStock') {
+          if (input.checked) delete config.inStock[sku]; else config.inStock[sku] = false;
+        }
+      });
+      config = await api.saveConfig(config);
+      showMessage('prices', 'Prices saved.', 'success');
+    } finally {
+      hideSaveSpinner();
+    }
   });
 
   const catalogSearchEl = document.getElementById('catalogSearch');
@@ -373,33 +415,43 @@
   });
 
   document.getElementById('btnNewSender').addEventListener('click', async () => {
-    if (!config) config = await api.getConfig();
-    const id = 'sender-' + Date.now();
-    const senders = config.senderProfiles || [];
-    senders.push({ id, name: '', address: '', vatNumber: '', companyCode: '', phone: '', email: '', ceo: '', website: '', logoPath: '', bankName: '', bankAddress: '', bankAccount: '', swift: '' });
-    config.senderProfiles = senders;
-    config.activeSenderId = id;
-    config = await api.saveConfig(config);
-    loadConfigForSettings();
-    showMessage('settings', 'New sender profile added. Fill in and save.', 'info');
+    showSaveSpinner();
+    try {
+      if (!config) config = await api.getConfig();
+      const id = 'sender-' + Date.now();
+      const senders = config.senderProfiles || [];
+      senders.push({ id, name: '', address: '', vatNumber: '', companyCode: '', phone: '', email: '', ceo: '', website: '', logoPath: '', bankName: '', bankAddress: '', bankAccount: '', swift: '' });
+      config.senderProfiles = senders;
+      config.activeSenderId = id;
+      config = await api.saveConfig(config);
+      loadConfigForSettings();
+      showMessage('settings', 'New sender profile added. Fill in and save.', 'info');
+    } finally {
+      hideSaveSpinner();
+    }
   });
 
   document.getElementById('btnSaveSender').addEventListener('click', async () => {
     const id = document.getElementById('senderProfileSelect').value;
     if (!id) { showMessage('settings', 'Select a sender to save, or create a new one.', 'error'); return; }
-    if (!config) config = await api.getConfig();
-    const senders = config.senderProfiles || [];
-    const data = readSenderForm();
-    const idx = senders.findIndex((p) => p.id === id);
-    if (idx >= 0) {
-      senders[idx] = { ...senders[idx], ...data };
-    } else {
-      senders.push({ id, ...data });
+    showSaveSpinner();
+    try {
+      if (!config) config = await api.getConfig();
+      const senders = config.senderProfiles || [];
+      const data = readSenderForm();
+      const idx = senders.findIndex((p) => p.id === id);
+      if (idx >= 0) {
+        senders[idx] = { ...senders[idx], ...data };
+      } else {
+        senders.push({ id, ...data });
+      }
+      config.senderProfiles = senders;
+      config = await api.saveConfig(config);
+      loadConfigForSettings();
+      showMessage('settings', 'Sender profile saved.', 'success');
+    } finally {
+      hideSaveSpinner();
     }
-    config.senderProfiles = senders;
-    config = await api.saveConfig(config);
-    loadConfigForSettings();
-    showMessage('settings', 'Sender profile saved.', 'success');
   });
 
   document.getElementById('btnSenderLogoBrowse').addEventListener('click', async () => {
@@ -417,53 +469,73 @@
   document.getElementById('btnDeleteSender').addEventListener('click', async () => {
     const id = document.getElementById('senderProfileSelect').value;
     if (!id) { showMessage('settings', 'Select a sender to delete.', 'error'); return; }
-    if (!config) config = await api.getConfig();
-    config.senderProfiles = (config.senderProfiles || []).filter((p) => p.id !== id);
-    if (config.activeSenderId === id) config.activeSenderId = (config.senderProfiles[0] && config.senderProfiles[0].id) || '';
-    config = await api.saveConfig(config);
-    loadConfigForSettings();
-    showMessage('settings', 'Sender profile deleted.', 'success');
+    showSaveSpinner();
+    try {
+      if (!config) config = await api.getConfig();
+      config.senderProfiles = (config.senderProfiles || []).filter((p) => p.id !== id);
+      if (config.activeSenderId === id) config.activeSenderId = (config.senderProfiles[0] && config.senderProfiles[0].id) || '';
+      config = await api.saveConfig(config);
+      loadConfigForSettings();
+      showMessage('settings', 'Sender profile deleted.', 'success');
+    } finally {
+      hideSaveSpinner();
+    }
   });
 
   document.getElementById('btnNewReceiver').addEventListener('click', async () => {
-    if (!config) config = await api.getConfig();
-    const id = 'receiver-' + Date.now();
-    const receivers = config.receiverProfiles || [];
-    receivers.push({ id, name: '', address: '', vatNumber: '' });
-    config.receiverProfiles = receivers;
-    config.activeReceiverId = id;
-    config = await api.saveConfig(config);
-    loadConfigForSettings();
-    showMessage('settings', 'New receiver profile added. Fill in and save.', 'info');
+    showSaveSpinner();
+    try {
+      if (!config) config = await api.getConfig();
+      const id = 'receiver-' + Date.now();
+      const receivers = config.receiverProfiles || [];
+      receivers.push({ id, name: '', address: '', vatNumber: '' });
+      config.receiverProfiles = receivers;
+      config.activeReceiverId = id;
+      config = await api.saveConfig(config);
+      loadConfigForSettings();
+      showMessage('settings', 'New receiver profile added. Fill in and save.', 'info');
+    } finally {
+      hideSaveSpinner();
+    }
   });
 
   document.getElementById('btnSaveReceiver').addEventListener('click', async () => {
     const id = document.getElementById('receiverProfileSelect').value;
     if (!id) { showMessage('settings', 'Select a receiver to save, or create a new one.', 'error'); return; }
-    if (!config) config = await api.getConfig();
-    const receivers = config.receiverProfiles || [];
-    const data = readReceiverForm();
-    const idx = receivers.findIndex((p) => p.id === id);
-    if (idx >= 0) {
-      receivers[idx] = { ...receivers[idx], ...data };
-    } else {
-      receivers.push({ id, ...data });
+    showSaveSpinner();
+    try {
+      if (!config) config = await api.getConfig();
+      const receivers = config.receiverProfiles || [];
+      const data = readReceiverForm();
+      const idx = receivers.findIndex((p) => p.id === id);
+      if (idx >= 0) {
+        receivers[idx] = { ...receivers[idx], ...data };
+      } else {
+        receivers.push({ id, ...data });
+      }
+      config.receiverProfiles = receivers;
+      config = await api.saveConfig(config);
+      loadConfigForSettings();
+      showMessage('settings', 'Receiver profile saved.', 'success');
+    } finally {
+      hideSaveSpinner();
     }
-    config.receiverProfiles = receivers;
-    config = await api.saveConfig(config);
-    loadConfigForSettings();
-    showMessage('settings', 'Receiver profile saved.', 'success');
   });
 
   document.getElementById('btnDeleteReceiver').addEventListener('click', async () => {
     const id = document.getElementById('receiverProfileSelect').value;
     if (!id) { showMessage('settings', 'Select a receiver to delete.', 'error'); return; }
-    if (!config) config = await api.getConfig();
-    config.receiverProfiles = (config.receiverProfiles || []).filter((p) => p.id !== id);
-    if (config.activeReceiverId === id) config.activeReceiverId = (config.receiverProfiles[0] && config.receiverProfiles[0].id) || '';
-    config = await api.saveConfig(config);
-    loadConfigForSettings();
-    showMessage('settings', 'Receiver profile deleted.', 'success');
+    showSaveSpinner();
+    try {
+      if (!config) config = await api.getConfig();
+      config.receiverProfiles = (config.receiverProfiles || []).filter((p) => p.id !== id);
+      if (config.activeReceiverId === id) config.activeReceiverId = (config.receiverProfiles[0] && config.receiverProfiles[0].id) || '';
+      config = await api.saveConfig(config);
+      loadConfigForSettings();
+      showMessage('settings', 'Receiver profile deleted.', 'success');
+    } finally {
+      hideSaveSpinner();
+    }
   });
 
   const SAMPLE_SENDER = {
@@ -489,95 +561,120 @@
   };
 
   document.getElementById('btnLoadSample').addEventListener('click', async () => {
-    if (!config) config = await api.getConfig();
-    const senders = config.senderProfiles || [];
-    const receivers = config.receiverProfiles || [];
-    if (!senders.find((p) => p.id === SAMPLE_SENDER.id)) senders.push(SAMPLE_SENDER);
-    if (!receivers.find((p) => p.id === SAMPLE_RECEIVER.id)) receivers.push(SAMPLE_RECEIVER);
-    config.senderProfiles = senders;
-    config.receiverProfiles = receivers;
-    config.activeSenderId = SAMPLE_SENDER.id;
-    config.activeReceiverId = SAMPLE_RECEIVER.id;
-    config.invoice = { ...config.invoice, currency: 'EUR', prefix: 'PF', paymentTerms: '100% Vorkasse', deliveryTerms: 'Frei Haus - Berlin', footerNotes: 'Thank you for your business. Please pay by the due date.' };
-    config.tax = { ...config.tax, vatRatePercent: 7, pricesIncludeVat: false };
-    config.shipping = { ...config.shipping, mode: 'fixed', fixedAmount: 0 };
-    config = await api.saveConfig(config);
-    loadConfigForSettings();
-    showMessage('settings', 'Sample sender and receiver profiles added and selected.', 'success');
+    showSaveSpinner();
+    try {
+      if (!config) config = await api.getConfig();
+      const senders = config.senderProfiles || [];
+      const receivers = config.receiverProfiles || [];
+      if (!senders.find((p) => p.id === SAMPLE_SENDER.id)) senders.push(SAMPLE_SENDER);
+      if (!receivers.find((p) => p.id === SAMPLE_RECEIVER.id)) receivers.push(SAMPLE_RECEIVER);
+      config.senderProfiles = senders;
+      config.receiverProfiles = receivers;
+      config.activeSenderId = SAMPLE_SENDER.id;
+      config.activeReceiverId = SAMPLE_RECEIVER.id;
+      config.invoice = { ...config.invoice, currency: 'EUR', prefix: 'PF', paymentTerms: '100% Vorkasse', deliveryTerms: 'Frei Haus - Berlin', footerNotes: 'Thank you for your business. Please pay by the due date.' };
+      config.tax = { ...config.tax, vatRatePercent: 7, pricesIncludeVat: false };
+      config.shipping = { ...config.shipping, mode: 'fixed', fixedAmount: 0 };
+      config = await api.saveConfig(config);
+      loadConfigForSettings();
+      showMessage('settings', 'Sample sender and receiver profiles added and selected.', 'success');
+    } finally {
+      hideSaveSpinner();
+    }
   });
 
   document.getElementById('btnSaveSettings').addEventListener('click', async () => {
-    const activeSenderId = document.getElementById('senderProfileSelect').value;
-    const activeReceiverId = document.getElementById('receiverProfileSelect').value;
-    const invoice = {
-      currency: document.getElementById('invoiceCurrency').value || 'EUR',
-      prefix: document.getElementById('invoicePrefix').value || 'INV',
-      nextNumber: parseInt(document.getElementById('invoiceNextNumber').value, 10) || 1,
-      saveDirectory: (document.getElementById('invoiceSaveDirectory') && document.getElementById('invoiceSaveDirectory').value) ? document.getElementById('invoiceSaveDirectory').value.trim() : '',
-      paymentTerms: document.getElementById('invoicePaymentTerms').value,
-      deliveryTerms: document.getElementById('invoiceDeliveryTerms').value,
-      footerNotes: document.getElementById('invoiceFooterNotes').value,
-    };
-    const tax = {
-      vatRatePercent: parseFloat(document.getElementById('vatRate').value) || 0,
-      pricesIncludeVat: document.getElementById('pricesIncludeVat').checked,
-    };
-    const shipping = {
-      mode: 'fixed',
-      fixedAmount: parseFloat(document.getElementById('shippingAmount').value) || 0,
-    };
+    showSaveSpinner();
+    try {
+      const activeSenderId = document.getElementById('senderProfileSelect').value;
+      const activeReceiverId = document.getElementById('receiverProfileSelect').value;
+      const invoice = {
+        currency: document.getElementById('invoiceCurrency').value || 'EUR',
+        prefix: document.getElementById('invoicePrefix').value || 'INV',
+        nextNumber: parseInt(document.getElementById('invoiceNextNumber').value, 10) || 1,
+        saveDirectory: (document.getElementById('invoiceSaveDirectory') && document.getElementById('invoiceSaveDirectory').value) ? document.getElementById('invoiceSaveDirectory').value.trim() : '',
+        paymentTerms: document.getElementById('invoicePaymentTerms').value,
+        deliveryTerms: document.getElementById('invoiceDeliveryTerms').value,
+        footerNotes: document.getElementById('invoiceFooterNotes').value,
+      };
+      const tax = {
+        vatRatePercent: parseFloat(document.getElementById('vatRate').value) || 0,
+        pricesIncludeVat: document.getElementById('pricesIncludeVat').checked,
+      };
+      const shipping = {
+        mode: 'fixed',
+        fixedAmount: parseFloat(document.getElementById('shippingAmount').value) || 0,
+      };
 
-    if (!config) config = await api.getConfig();
-    config.activeSenderId = activeSenderId || '';
-    config.activeReceiverId = activeReceiverId || '';
-    config.invoice = { ...config.invoice, ...invoice };
-    config.tax = { ...config.tax, ...tax };
-    config.shipping = { ...config.shipping, ...shipping };
+      if (!config) config = await api.getConfig();
+      config.activeSenderId = activeSenderId || '';
+      config.activeReceiverId = activeReceiverId || '';
+      config.invoice = { ...config.invoice, ...invoice };
+      config.tax = { ...config.tax, ...tax };
+      config.shipping = { ...config.shipping, ...shipping };
 
-    const senders = config.senderProfiles || [];
-    if (activeSenderId) {
-      const senderData = readSenderForm();
-      const si = senders.findIndex((p) => p.id === activeSenderId);
-      if (si >= 0) senders[si] = { ...senders[si], ...senderData };
+      const senders = config.senderProfiles || [];
+      if (activeSenderId) {
+        const senderData = readSenderForm();
+        const si = senders.findIndex((p) => p.id === activeSenderId);
+        if (si >= 0) senders[si] = { ...senders[si], ...senderData };
+      }
+      if (activeReceiverId) {
+        const receiverData = readReceiverForm();
+        const ri = (config.receiverProfiles || []).findIndex((p) => p.id === activeReceiverId);
+        const receivers = config.receiverProfiles || [];
+        if (ri >= 0) receivers[ri] = { ...receivers[ri], ...receiverData };
+        config.receiverProfiles = receivers;
+      }
+      config.senderProfiles = senders;
+
+      config = await api.saveConfig(config);
+      loadConfigForSettings();
+      showMessage('settings', 'Settings saved.', 'success');
+    } finally {
+      hideSaveSpinner();
     }
-    if (activeReceiverId) {
-      const receiverData = readReceiverForm();
-      const ri = (config.receiverProfiles || []).findIndex((p) => p.id === activeReceiverId);
-      const receivers = config.receiverProfiles || [];
-      if (ri >= 0) receivers[ri] = { ...receivers[ri], ...receiverData };
-      config.receiverProfiles = receivers;
-    }
-    config.senderProfiles = senders;
-
-    config = await api.saveConfig(config);
-    loadConfigForSettings();
-    showMessage('settings', 'Settings saved.', 'success');
   });
 
   document.getElementById('btnResetConfig').addEventListener('click', async () => {
-    config = await api.resetConfigToDefault();
-    loadConfigForSettings();
-    showMessage('settings', 'Config reset to default.', 'success');
+    showSaveSpinner();
+    try {
+      config = await api.resetConfigToDefault();
+      loadConfigForSettings();
+      showMessage('settings', 'Config reset to default.', 'success');
+    } finally {
+      hideSaveSpinner();
+    }
   });
 
   document.getElementById('btnLoadConfig').addEventListener('click', async () => {
     const result = await api.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'JSON', extensions: ['json'] }] });
     if (result.canceled || !result.filePaths.length) return;
-    config = await api.loadConfigFile(result.filePaths[0]);
-    if (!config) {
-      showMessage('settings', 'Failed to load config.', 'error');
-      return;
+    showSaveSpinner();
+    try {
+      config = await api.loadConfigFile(result.filePaths[0]);
+      if (!config) {
+        showMessage('settings', 'Failed to load config.', 'error');
+        return;
+      }
+      loadConfigForSettings();
+      showMessage('settings', 'Config loaded and set as main.', 'success');
+    } finally {
+      hideSaveSpinner();
     }
-    loadConfigForSettings();
-    showMessage('settings', 'Config loaded and set as main.', 'success');
   });
 
   document.getElementById('btnSaveConfigAs').addEventListener('click', async () => {
     if (!config) config = await api.getConfig();
     const result = await api.showSaveDialog({ filters: [{ name: 'JSON', extensions: ['json'] }], defaultPath: 'config_' + new Date().toISOString().slice(0, 10) + '.json' });
     if (result.canceled || !result.filePath) return;
-    await api.saveConfigAs(result.filePath, config);
-    showMessage('settings', 'Config saved to file.', 'success');
+    showSaveSpinner();
+    try {
+      await api.saveConfigAs(result.filePath, config);
+      showMessage('settings', 'Config saved to file.', 'success');
+    } finally {
+      hideSaveSpinner();
+    }
   });
 
   function applyPacklistResult(ordersList, pathOrLabel) {
@@ -653,21 +750,26 @@
       showMessage('packlist', 'Load a packlist first.', 'error');
       return;
     }
-    config = await api.getConfig();
-    config.invoice = config.invoice || {};
-    config.invoice.batchNumber = (document.getElementById('packlistBatchNumber') && document.getElementById('packlistBatchNumber').value) ? document.getElementById('packlistBatchNumber').value.trim() : '';
-    const res = await api.generatePdf({
-      orders,
-      config,
-      skuGuidePath: skuGuidePath || undefined,
-      preview: true,
-    });
-    if (res.error) {
-      showMessage('packlist', res.error, 'error');
-      return;
+    showSaveSpinner('Generating…');
+    try {
+      config = await api.getConfig();
+      config.invoice = config.invoice || {};
+      config.invoice.batchNumber = (document.getElementById('packlistBatchNumber') && document.getElementById('packlistBatchNumber').value) ? document.getElementById('packlistBatchNumber').value.trim() : '';
+      const res = await api.generatePdf({
+        orders,
+        config,
+        skuGuidePath: skuGuidePath || undefined,
+        preview: true,
+      });
+      if (res.error) {
+        showMessage('packlist', res.error, 'error');
+        return;
+      }
+      await api.saveConfig(config);
+      showMessage('packlist', 'Preview opened in your default PDF viewer.', 'success');
+    } finally {
+      hideSaveSpinner();
     }
-    await api.saveConfig(config);
-    showMessage('packlist', 'Preview opened in your default PDF viewer.', 'success');
   });
 
   document.getElementById('btnGeneratePdf').addEventListener('click', async () => {
@@ -675,39 +777,49 @@
       showMessage('packlist', 'Load a packlist first.', 'error');
       return;
     }
-    config = await api.getConfig();
-    config.invoice = config.invoice || {};
-    config.invoice.batchNumber = (document.getElementById('packlistBatchNumber') && document.getElementById('packlistBatchNumber').value) ? document.getElementById('packlistBatchNumber').value.trim() : '';
-    const inv = config.invoice || {};
-    const prefix = (inv.prefix || 'INV').trim() || 'INV';
-    const year = new Date().getFullYear();
-    const nextNum = inv.nextNumber != null ? parseInt(inv.nextNumber, 10) : 1;
-    const defaultFilename = prefix + '-' + year + '-' + String(nextNum).padStart(5, '0') + '.pdf';
-    let outputPath;
-    if (inv.saveDirectory && inv.saveDirectory.trim()) {
-      outputPath = await api.getDefaultInvoicePath(inv.saveDirectory.trim(), defaultFilename);
-    } else {
-      const result = await api.showSaveDialog({
-        defaultPath: defaultFilename,
-        filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    showSaveSpinner('Generating…');
+    try {
+      config = await api.getConfig();
+      config.invoice = config.invoice || {};
+      config.invoice.batchNumber = (document.getElementById('packlistBatchNumber') && document.getElementById('packlistBatchNumber').value) ? document.getElementById('packlistBatchNumber').value.trim() : '';
+      const inv = config.invoice || {};
+      const prefix = (inv.prefix || 'INV').trim() || 'INV';
+      const year = new Date().getFullYear();
+      const nextNum = inv.nextNumber != null ? parseInt(inv.nextNumber, 10) : 1;
+      const defaultFilename = prefix + '-' + year + '-' + String(nextNum).padStart(5, '0') + '.pdf';
+      let outputPath;
+      if (inv.saveDirectory && inv.saveDirectory.trim()) {
+        outputPath = await api.getDefaultInvoicePath(inv.saveDirectory.trim(), defaultFilename);
+      } else {
+        const result = await api.showSaveDialog({
+          defaultPath: defaultFilename,
+          filters: [{ name: 'PDF', extensions: ['pdf'] }],
+        });
+        if (result.canceled || !result.filePath) return;
+        outputPath = result.filePath;
+      }
+      const res = await api.generatePdf({
+        orders,
+        config,
+        skuGuidePath: skuGuidePath || undefined,
+        outputPath,
       });
-      if (result.canceled || !result.filePath) return;
-      outputPath = result.filePath;
+      if (res.error) {
+        showMessage('packlist', res.error, 'error');
+        return;
+      }
+      config = await api.getConfig();
+      showMessage('packlist', 'PDF saved: ' + res.path, 'success');
+      if (typeof renderInvoiceHistory === 'function') renderInvoiceHistory();
+    } finally {
+      hideSaveSpinner();
     }
-    const res = await api.generatePdf({
-      orders,
-      config,
-      skuGuidePath: skuGuidePath || undefined,
-      outputPath,
-    });
-    if (res.error) {
-      showMessage('packlist', res.error, 'error');
-      return;
-    }
-    config = await api.getConfig();
-    showMessage('packlist', 'PDF saved: ' + res.path, 'success');
-    if (typeof renderInvoiceHistory === 'function') renderInvoiceHistory();
   });
+
+  const btnPreviewTop = document.getElementById('btnPreviewPdfTop');
+  const btnGenerateTop = document.getElementById('btnGeneratePdfTop');
+  if (btnPreviewTop) btnPreviewTop.addEventListener('click', () => document.getElementById('btnPreviewPdf').click());
+  if (btnGenerateTop) btnGenerateTop.addEventListener('click', () => document.getElementById('btnGeneratePdf').click());
 
   switchTab('prices');
   (async function init() {
@@ -718,7 +830,7 @@
       skuGuidePath = await api.getDefaultSkuGuidePath();
       document.getElementById('skuGuidePath').textContent = '(Baby best food – ' + products.length + ' products)';
     } else if (config.customProducts && Object.keys(config.customProducts).length) {
-      products = Object.entries(config.customProducts).map(([id, p]) => ({ id, gtin: p.gtin || '', title: p.title || id, batch: p.batch, bbd: p.bbd }));
+      products = Object.entries(config.customProducts).map(([id, p]) => ({ id, gtin: p.gtin || '', title: p.title || id, batch: p.batch, bbd: p.bbd, articleNo: p.articleNo || '' }));
       document.getElementById('skuGuidePath').textContent = '(custom products only)';
     }
     renderPricesTable();

@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('invoicing', {
   generatePdf: (opts) => ipcRenderer.invoke('generate-pdf', opts),
   openPath: (filePath) => ipcRenderer.invoke('open-path', filePath),
   getDefaultInvoicePath: (saveDir, filename) => ipcRenderer.invoke('get-default-invoice-path', { saveDir, filename }),
+  getAssetUrl: (name) => ipcRenderer.invoke('get-asset-url', name),
 });
 
 window.addEventListener('DOMContentLoaded', () => {

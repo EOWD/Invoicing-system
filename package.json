@@ -10,6 +10,7 @@
     "make": "electron-forge make",
     "build": "electron-builder",
     "build:mac": "electron-builder --mac",
+    "build:mac:intel": "electron-builder --mac --x64",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "config": {
@@ -63,6 +64,29 @@
     },
     "win": {
       "icon": "assets/icon.ico"
-    }
+    },
+    "files": [
+      "**/*",
+      "!config/config.json",
+      "!config/palette.json",
+      "!dist",
+      "!dist/**",
+      "!out",
+      "!out/**",
+      "!dist.0111",
+      "!dist.0111/**",
+      "!distjhbkjhb",
+      "!distjhbkjhb/**",
+      "!main-export1",
+      "!main-export1/**",
+      "!hhhhh",
+      "!hhhhh/**",
+      "!**/mac-universal/**",
+      "!**/*.dmg",
+      "!**/*.zip",
+      "!**/*.blockmap",
+      "!.git",
+      "!.git/**"
+    ]
   }
 }
